@@ -1,0 +1,439 @@
+use super::{coord::Coord, game::Game};
+use crate::{
+    constants::{DisplayMode, BLACK, UNDEFINED_POSITION, WHITE},
+    pieces::{PieceColor, PieceType},
+    ui::{main_ui::render_cell, prompt::Prompt},
+    utils::{convert_position_into_notation, get_cell_paragraph, invert_position},
+};
+use ratatui::{
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style, Stylize},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, Padding, Paragraph},
+    Frame,
+};
+
+#[derive(Clone)]
+pub struct UI {
+    pub cursor_coordinates: Coord,
+    pub selected_coordinates: Coord,
+    pub selected_piece_cursor: i8,
+    pub promotion_cursor: i8,
+    pub old_cursor_position: Coord,
+    pub top_x: u16,
+    pub top_y: u16,
+    pub width: u16,
+    pub height: u16,
+    pub mouse_used: bool,
+    pub display_mode: DisplayMode,
+    pub prompt: Prompt,
+}
+
+impl Default for UI {
+    fn default() -> Self {
+        UI {
+            cursor_coordinates: Coord::new(4, 4),
+            selected_coordinates: Coord::undefined(),
+            selected_piece_cursor: 0,
+            promotion_cursor: 0,
+            old_cursor_position: Coord::undefined(),
+            top_x: 0,
+            top_y: 0,
+            width: 0,
+            height: 0,
+            mouse_used: false,
+            display_mode: DisplayMode::DEFAULT,
+            prompt: Prompt::new(),
+        }
+    }
+}
+
+impl UI {
+    pub fn reset(&mut self) {
+        self.cursor_coordinates = Coord::new(4, 4);
+        self.selected_coordinates = Coord::undefined();
+        self.selected_piece_cursor = 0;
+        self.promotion_cursor = 0;
+        self.old_cursor_position = Coord::undefined();
+        self.top_x = 0;
+        self.top_y = 0;
+        self.width = 0;
+        self.height = 0;
+        self.mouse_used = false;
+    }
+
+    pub fn is_cell_selected(&self) -> bool {
+        self.selected_coordinates.row != UNDEFINED_POSITION
+            && self.selected_coordinates.col != UNDEFINED_POSITION
+    }
+
+    pub fn move_selected_piece_cursor(
+        &mut self,
+        first_time_moving: bool,
+        direction: i8,
+        mut authorized_positions: Vec<Coord>,
+    ) {
+        if authorized_positions.is_empty() {
+            self.cursor_coordinates = Coord::undefined();
+        } else {
+            self.selected_piece_cursor = if self.selected_piece_cursor == 0 && first_time_moving {
+                0
+            } else {
+                let new_cursor =
+                    (self.selected_piece_cursor + direction) % authorized_positions.len() as i8;
+                if new_cursor == -1 {
+                    authorized_positions.len() as i8 - 1
+                } else {
+                    new_cursor
+                }
+            };
+
+            authorized_positions.sort();
+
+            if let Some(position) = authorized_positions.get(self.selected_piece_cursor as usize) {
+                self.cursor_coordinates = *position;
+            }
+        }
+    }
+
+    pub fn cursor_up(&mut self, authorized_positions: Vec<Coord>) {
+        if self.is_cell_selected() {
+            self.move_selected_piece_cursor(false, -1, authorized_positions);
+        } else if self.cursor_coordinates.row > 0 {
+            self.cursor_coordinates.row -= 1;
+        }
+    }
+
+    pub fn cursor_down(&mut self, authorized_positions: Vec<Coord>) {
+        if self.is_cell_selected() {
+            self.move_selected_piece_cursor(false, 1, authorized_positions);
+        } else if self.cursor_coordinates.row < 7 {
+            self.cursor_coordinates.row += 1;
+        }
+    }
+
+    pub fn cursor_left(&mut self, authorized_positions: Vec<Coord>) {
+        if self.is_cell_selected() {
+            self.move_selected_piece_cursor(false, -1, authorized_positions);
+        } else if self.cursor_coordinates.col > 0 {
+            self.cursor_coordinates.col -= 1;
+        }
+    }
+
+    pub fn cursor_left_promotion(&mut self) {
+        self.promotion_cursor = if self.promotion_cursor > 0 {
+            self.promotion_cursor - 1
+        } else {
+            3
+        };
+    }
+
+    pub fn cursor_right(&mut self, authorized_positions: Vec<Coord>) {
+        if self.is_cell_selected() {
+            self.move_selected_piece_cursor(false, 1, authorized_positions);
+        } else if self.cursor_coordinates.col < 7 {
+            self.cursor_coordinates.col += 1;
+        }
+    }
+
+    pub fn cursor_right_promotion(&mut self) {
+        self.promotion_cursor = (self.promotion_cursor + 1) % 4;
+    }
+
+    pub fn unselect_cell(&mut self) {
+        if self.is_cell_selected() {
+            self.selected_coordinates = Coord::undefined();
+            self.selected_piece_cursor = 0;
+            self.cursor_coordinates = self.old_cursor_position;
+        }
+    }
+
+    pub fn history_render(&self, area: Rect, frame: &mut Frame, game: &Game) {
+        let history_block = Block::default()
+            .title("History")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(WHITE))
+            .border_type(BorderType::Rounded)
+            .padding(Padding::new(5, 10, 1, 2));
+
+        let mut lines: Vec<Line> = vec![];
+
+        for i in (0..game.game_board.move_history.len()).step_by(2) {
+            let piece_type_from = game.game_board.move_history[i].piece_type;
+
+            let utf_icon_white =
+                PieceType::piece_to_utf_enum(&piece_type_from, Some(PieceColor::White));
+            let move_white = convert_position_into_notation(&format!(
+                "{}{}{}{}",
+                game.game_board.move_history[i].from.row,
+                game.game_board.move_history[i].from.col,
+                game.game_board.move_history[i].to.row,
+                game.game_board.move_history[i].to.col
+            ));
+
+            let mut utf_icon_black = "   ";
+            let mut move_black: String = "   ".to_string();
+
+            if i + 1 < game.game_board.move_history.len() {
+                let piece_type_to = game.game_board.move_history[i + 1].piece_type;
+                let black_move = &game.game_board.move_history[i + 1];
+
+                let (from, to) = if game.bot.is_none() {
+                    (
+                        invert_position(&black_move.from),
+                        invert_position(&black_move.to),
+                    )
+                } else {
+                    (black_move.from, black_move.to)
+                };
+
+                move_black = convert_position_into_notation(&format!(
+                    "{}{}{}{}",
+                    from.row, from.col, to.row, to.col
+                ));
+                utf_icon_black =
+                    PieceType::piece_to_utf_enum(&piece_type_to, Some(PieceColor::Black));
+            }
+
+            lines.push(Line::from(vec![
+                Span::raw(format!("{}.  ", i / 2 + 1)),
+                Span::styled(format!("{utf_icon_white} "), Style::default().fg(WHITE)),
+                Span::raw(move_white.to_string()),
+                Span::raw("     "),
+                Span::styled(format!("{utf_icon_black} "), Style::default().fg(WHITE)),
+                Span::raw(move_black.to_string()),
+            ]));
+        }
+
+        let history_paragraph = Paragraph::new(lines).alignment(Alignment::Center);
+
+        let height = area.height;
+
+        let right_panel_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(height - 1), Constraint::Length(1)].as_ref())
+            .split(area);
+
+        frame.render_widget(history_block.clone(), right_panel_layout[0]);
+        frame.render_widget(
+            history_paragraph,
+            history_block.inner(right_panel_layout[0]),
+        );
+    }
+
+    pub fn white_material_render(
+        &self,
+        area: Rect,
+        frame: &mut Frame,
+        white_taken_pieces: &[PieceType],
+    ) {
+        let white_block = Block::default()
+            .title("White material")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(WHITE))
+            .border_type(BorderType::Rounded);
+
+        let mut pieces: String = String::new();
+
+        for piece in white_taken_pieces {
+            let utf_icon_white = PieceType::piece_to_utf_enum(piece, Some(PieceColor::Black));
+            pieces.push_str(&format!("{utf_icon_white} "));
+        }
+        let white_material_paragraph = Paragraph::new(pieces)
+            .alignment(Alignment::Center)
+            .add_modifier(Modifier::BOLD);
+
+        let height = area.height;
+
+        let right_panel_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(height - 1), Constraint::Length(1)].as_ref())
+            .split(area);
+        frame.render_widget(white_block.clone(), right_panel_layout[0]);
+        frame.render_widget(
+            white_material_paragraph,
+            white_block.inner(right_panel_layout[0]),
+        );
+
+        let text = vec![Line::from("Press ? for help").alignment(Alignment::Center)];
+        let help_paragraph = Paragraph::new(text)
+            .block(Block::new())
+            .alignment(Alignment::Center);
+        frame.render_widget(help_paragraph, right_panel_layout[1]);
+    }
+
+    pub fn black_material_render(
+        &self,
+        area: Rect,
+        frame: &mut Frame,
+        black_taken_pieces: &Vec<PieceType>,
+    ) {
+        let black_block = Block::default()
+            .title("Black material")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(WHITE))
+            .border_type(BorderType::Rounded);
+
+        let mut pieces: String = String::new();
+
+        for piece in black_taken_pieces {
+            let utf_icon_black = PieceType::piece_to_utf_enum(piece, Some(PieceColor::White));
+            pieces.push_str(&format!("{utf_icon_black} "));
+        }
+
+        let black_material_paragraph = Paragraph::new(pieces)
+            .alignment(Alignment::Center)
+            .add_modifier(Modifier::BOLD);
+
+        let height = area.height;
+
+        let right_panel_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(height - 1), Constraint::Length(1)].as_ref())
+            .split(area);
+
+        frame.render_widget(black_block.clone(), right_panel_layout[0]);
+        frame.render_widget(
+            black_material_paragraph,
+            black_block.inner(right_panel_layout[0]),
+        );
+    }
+
+    pub fn board_render(&mut self, area: Rect, frame: &mut Frame<'_>, game: &Game) {
+        let width = area.width / 8;
+        let height = area.height / 8;
+        let border_height = area.height / 2 - (4 * height);
+        let border_width = area.width / 2 - (4 * width);
+
+        self.top_x = area.x + border_width;
+        self.top_y = area.y + border_height;
+        self.width = width;
+        self.height = height;
+
+        let columns = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Length(border_height),
+                    Constraint::Length(height),
+                    Constraint::Length(height),
+                    Constraint::Length(height),
+                    Constraint::Length(height),
+                    Constraint::Length(height),
+                    Constraint::Length(height),
+                    Constraint::Length(height),
+                    Constraint::Length(height),
+                    Constraint::Length(border_height),
+                ]
+                    .as_ref(),
+            )
+            .split(area);
+
+        for i in 0..8u8 {
+            let lines = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(
+                    [
+                        Constraint::Length(border_width),
+                        Constraint::Length(width),
+                        Constraint::Length(width),
+                        Constraint::Length(width),
+                        Constraint::Length(width),
+                        Constraint::Length(width),
+                        Constraint::Length(width),
+                        Constraint::Length(width),
+                        Constraint::Length(width),
+                        Constraint::Length(border_width),
+                    ]
+                        .as_ref(),
+                )
+                .split(columns[i as usize + 1]);
+            for j in 0..8u8 {
+                let cell_color: Color = if (i + j) % 2 == 0 { WHITE } else { BLACK };
+
+                let last_move;
+                let mut last_move_from = Coord::undefined();
+                let mut last_move_to = Coord::undefined();
+                if !game.game_board.move_history.is_empty() {
+                    last_move = game.game_board.move_history.last();
+                    if game.bot.is_some()
+                        && !game.bot.as_ref().is_some_and(|bot| bot.is_bot_starting)
+                    {
+                        last_move_from = last_move.map(|m| m.from).unwrap();
+                        last_move_to = last_move.map(|m| m.to).unwrap();
+                    } else {
+                        last_move_from = invert_position(&last_move.map(|m| m.from).unwrap());
+                        last_move_to = invert_position(&last_move.map(|m| m.to).unwrap());
+                    }
+
+                    if game.opponent.is_some()
+                        && game.opponent.as_ref().unwrap().color == game.player_turn
+                    {
+                        last_move_from = Coord::undefined();
+                        last_move_to = Coord::undefined();
+                    }
+                }
+
+                let mut positions: Vec<Coord> = vec![];
+                let is_cell_in_positions = |positions: &Vec<Coord>, i: u8, j: u8| {
+                    positions.iter().any(|&coord| coord == Coord::new(i, j))
+                };
+
+                if self.is_cell_selected() {
+                    let selected_piece_color: Option<PieceColor> =
+                        game.game_board.get_piece_color(&self.selected_coordinates);
+                    if match selected_piece_color {
+                        Some(color) => color == game.player_turn,
+                        None => false,
+                    } {
+                        positions = game
+                            .game_board
+                            .get_authorized_positions(game.player_turn, self.selected_coordinates);
+                    }
+                }
+
+                let square = lines[j as usize + 1];
+
+                if i == self.cursor_coordinates.row
+                    && j == self.cursor_coordinates.col
+                    && !self.mouse_used
+                {
+                    render_cell(frame, square, Color::LightBlue, None);
+                } else if game
+                    .game_board
+                    .is_getting_checked(game.game_board.board, game.player_turn)
+                    && Coord::new(i, j)
+                    == game
+                    .game_board
+                    .get_king_coordinates(game.game_board.board, game.player_turn)
+                {
+                    render_cell(frame, square, Color::Magenta, Some(Modifier::SLOW_BLINK));
+                } else if (i == self.selected_coordinates.row && j == self.selected_coordinates.col)
+                    || (last_move_from == Coord::new(i, j)
+                    || (last_move_to == Coord::new(i, j)
+                    && !is_cell_in_positions(&positions, i, j)))
+                {
+                    render_cell(frame, square, Color::LightGreen, None);
+                } else if is_cell_in_positions(&positions, i, j) {
+                    render_cell(frame, square, Color::Rgb(100, 100, 100), None);
+                } else {
+                    let mut cell = Block::default();
+                    cell = match self.display_mode {
+                        DisplayMode::DEFAULT => cell.bg(cell_color),
+                        DisplayMode::ASCII => match cell_color {
+                            WHITE => cell.bg(Color::White).fg(Color::Black),
+                            BLACK => cell.bg(Color::Black).fg(Color::White),
+                            _ => cell.bg(cell_color),
+                        },
+                    };
+                    frame.render_widget(cell.clone(), square);
+                }
+
+                let coord = Coord::new(i, j);
+                let paragraph = get_cell_paragraph(game, &coord, square);
+
+                frame.render_widget(paragraph, square);
+            }
+        }
+    }
+}

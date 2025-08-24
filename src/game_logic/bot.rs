@@ -1,40 +1,40 @@
-use std::borrow::Cow;
-use crate::utilis::convert_notation_into_position;
+use crate::utils::convert_notation_into_position;
 use ruci::{Engine, Go};
 use shakmaty::fen::Fen;
+
+use std::borrow::Cow;
 use std::cell::RefCell;
-use std::io::{BufReader, BuffReader};
+use std::io::BufReader;
 use std::process::{Child, ChildStdin, ChildStdout, Command};
 use std::rc::Rc;
 use std::str::FromStr;
 
-
 #[derive(Clone)]
+pub struct Bot {
 
-pub  struct Bot {
     #[allow(dead_code)]
-    process:Rc<RefCell<Child>>,
-    engine: Rc<RefCell<Engine<BufReader<ChildStdout>, ChildStdout>>>,
+    process: Rc<RefCell<Child>>,
+    engine: Rc<RefCell<Engine<BufReader<ChildStdout>, ChildStdin>>>,
+
     pub bot_will_move: bool,
+
     pub is_bot_starting: bool,
 }
 
-
 impl Bot {
-    pub fn new(engine_path:& str, is_bot_starting: bool) -> Bot {
+    pub fn new(engine_path: &str, is_bot_starting: bool) -> Bot {
         let mut process = Command::new(engine_path)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .spawn()
             .unwrap();
 
-        let engine =  Rc::new(RefCell::new(
+        let engine = Rc::new(RefCell::new(
             Engine::from_process(&mut process, false).unwrap(),
-
         ));
 
         Self {
-            process: Rc:new(RefCell::new(process)),
+            process: Rc::new(RefCell::new(process)),
             engine,
             bot_will_move: false,
             is_bot_starting,
@@ -44,10 +44,9 @@ impl Bot {
     pub fn get_move(&self, fen: &str) -> String {
         let mut engine = self.engine.borrow_mut();
 
-
         engine
             .send(ruci::Position::Fen {
-                fen:Cow::Owned(Fen::from_str(fen).unwrap()),
+                fen: Cow::Owned(Fen::from_str(fen).unwrap()),
                 moves: Cow::Borrowed(&[]),
             })
             .unwrap();
