@@ -1,0 +1,27 @@
+[package]
+name = "chess"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.41"
+clap = { version = "4.5.43", features = ["derive"] }
+dirs = "6.0.0"
+log = "0.4.27"
+ratatui = "0.29.0"
+ruci = { version = "2.1.0", features = ["engine-sync"] }
+shakmaty = { version = "0.27.3", default-features = false }
+simplelog = "0.12.2"
+toml = "0.9.5"
+
+
+
+[features]
+Chess = []
+default = ["Chess"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+strip = true
