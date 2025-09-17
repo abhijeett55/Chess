@@ -1,4 +1,5 @@
 use super::{coord::Coord, game::Game};
+
 use crate::{
     constants::{DisplayMode, BLACK, UNDEFINED_POSITION, WHITE},
     pieces::{PieceColor, PieceType},
@@ -389,6 +390,12 @@ impl UI {
                         positions = game
                             .game_board
                             .get_authorized_positions(game.player_turn, self.selected_coordinates);
+
+                            for coords in positions.clone() {
+                                if i == coords.row && j == coords.col {
+                                    
+                                }
+                            }
                     }
                 }
 

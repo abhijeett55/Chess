@@ -134,7 +134,10 @@ impl Opponent {
                 move_to_send.from.col,
                 move_to_send.to.row,
                 move_to_send.to.col,
-                promotion_type.unwrap_or_else(|| "".to_string())
+                match promotion_type {
+                    Some(promotion) => promotion,
+                    None => "".to_string(),
+                }
             );
 
             if let Err(e) = game_stream.write_all(move_str.as_bytes()) {

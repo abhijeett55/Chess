@@ -1,4 +1,5 @@
 use crate::constants::UNDEFINED_POSITION;
+
 #[derive(PartialEq, Clone, Debug, Eq, PartialOrd, Ord, Copy)]
 pub struct Coord {
     pub row: u8,
@@ -14,7 +15,7 @@ impl Coord {
     }
 
     pub fn opt_new<U1: TryInto<u8>, U2: TryInto<u8>>(row: U1, col: U2) -> Option<Self> {
-        let row : u8 = row.try_into().ok()?;
+        let row: u8 = row.try_into().ok()?;
         let col: u8 = col.try_into().ok()?;
 
         let ret = Coord { row, col };

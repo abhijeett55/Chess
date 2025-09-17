@@ -38,17 +38,11 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct GameBoard {
-
     pub board: Board,
-
     pub move_history: Vec<PieceMove>,
-
     pub board_history: Vec<Board>,
-
     consecutive_non_pawn_or_capture: i32,
-
     pub white_taken_pieces: Vec<PieceType>,
-
     pub black_taken_pieces: Vec<PieceType>,
 }
 
@@ -77,16 +71,16 @@ impl GameBoard {
         }
     }
 
-        pub fn record_move(&mut self, piece_type: PieceType, piece_color: PieceColor, from: Coord, to: Coord) {
-            let move_entry = PieceMove {
-                piece_type,
-                piece_color,
-                from,
-                to,
-            };
-            self.move_history.push(move_entry);
-            self.board_history.push(self.board); // snapshot current board after the move
-        }
+        // pub fn record_move(&mut self, piece_type: PieceType, piece_color: PieceColor, from: Coord, to: Coord) {
+        //     let move_entry = PieceMove {
+        //         piece_type,
+        //         piece_color,
+        //         from,
+        //         to,
+        //     };
+        //     self.move_history.push(move_entry);
+        //     self.board_history.push(self.board); // snapshot current board after the move
+        // }
 
 
     pub fn get_last_move_piece_type_as_string(&self) -> String {
@@ -392,13 +386,9 @@ impl GameBoard {
         for position in positions {
             let game = GameBoard::new(self.board, self.move_history.to_vec(), vec![]);
 
-            // We create a new board
+            
             let mut new_board = Game::new(game, color);
-
-            // We simulate the move
-
             Game::execute_move(&mut new_board, original_coordinates, &position);
-
             // We check if the board is still checked with this move meaning it didn't resolve the problem
             if !self.is_getting_checked(new_board.game_board.board, new_board.player_turn) {
                 cleaned_position.push(position);
@@ -422,7 +412,7 @@ impl GameBoard {
         self.board[coordinates].map(|(piece_type, _)| piece_type)
     }
 
-    // Convert the history and game status to a FEN string
+    
     pub fn fen_position(&mut self, is_bot_starting: bool, _player_turn: PieceColor) -> String {
         let mut result = String::new();
         let bot_color = if is_bot_starting {
@@ -433,10 +423,10 @@ impl GameBoard {
 
         let king_col = if bot_color == PieceColor::White { 4 } else { 3 };
 
-        // We loop through the board and convert it to a FEN string
+        
         for i in 0..8u8 {
             for j in 0..8u8 {
-                // We get the piece type and color
+                
                 let (piece_type, piece_color) = (
                     self.get_piece_type(&Coord::new(i, j)),
                     self.get_piece_color(&Coord::new(i, j)),
@@ -445,7 +435,7 @@ impl GameBoard {
                 // Pattern match directly on the result of piece_to_fen_enum
                 match letter {
                     "" => {
-                        // Check if the string is not empty before using chars().last()
+                        
                         if let Some(last_char) = result.chars().last() {
                             if last_char.is_ascii_digit() {
                                 let incremented_char =
@@ -470,10 +460,10 @@ impl GameBoard {
             result.push('/');
         }
 
-        // we remove the last / and specify the player turn (black)
+        
         result.pop();
 
-        // We say it is blacks turn to play
+       
         result.push_str(if bot_color == PieceColor::Black {
             " b"
         } else {
@@ -489,7 +479,7 @@ impl GameBoard {
                 Coord::new(7, king_col),
             )) && !self.is_getting_checked(self.board, PieceColor::Black)
             {
-                // king side black castle availability
+                
                 if !self.did_piece_already_move((
                     Some(PieceType::Rook),
                     Some(turn),
@@ -497,7 +487,7 @@ impl GameBoard {
                 )) {
                     possible_castles.push((turn, 'k'));
                 }
-                // queen side black castle availability
+                
                 if !self.did_piece_already_move((
                     Some(PieceType::Rook),
                     Some(turn),

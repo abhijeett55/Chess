@@ -1,6 +1,5 @@
 pub mod board;
 pub mod bot;
-
 pub mod opponent;
 pub mod ui;
 pub mod coord;

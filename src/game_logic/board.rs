@@ -2,6 +2,7 @@ use super::coord::Coord;
 use crate::pieces::{PieceColor, PieceType};
 
 pub type Board = [[Option<(PieceType, PieceColor)>; 8]; 8];
+
 impl std::ops::Index<&Coord> for Board {
     type Output = Option<(PieceType, PieceColor)>;
 
@@ -28,14 +29,14 @@ pub fn init_board() -> Board {
             Some((PieceType::Rook, PieceColor::Black)),
         ],
         [
-            Some((PieceType::Rook, PieceColor::Black)),
-            Some((PieceType::Rook, PieceColor::Black)),
-            Some((PieceType::Rook, PieceColor::Black)),
-            Some((PieceType::Rook, PieceColor::Black)),
-            Some((PieceType::Rook, PieceColor::Black)),
-            Some((PieceType::Rook, PieceColor::Black)),
-            Some((PieceType::Rook, PieceColor::Black)),
-            Some((PieceType::Rook, PieceColor::Black)),
+            Some((PieceType::Pawn, PieceColor::Black)),
+            Some((PieceType::Pawn, PieceColor::Black)),
+            Some((PieceType::Pawn, PieceColor::Black)),
+            Some((PieceType::Pawn, PieceColor::Black)),
+            Some((PieceType::Pawn PieceColor::Black)),
+            Some((PieceType::Pawn, PieceColor::Black)),
+            Some((PieceType::Pawn, PieceColor::Black)),
+            Some((PieceType::Pawn, PieceColor::Black)),
         ],
         [None, None, None, None, None, None, None, None],
         [None, None, None, None, None, None, None, None],
